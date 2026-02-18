@@ -5,13 +5,13 @@ import plotly.express as px
 # 1. CONFIGURAZIONE PAGINA E STILE
 st.set_page_config(page_title="Gofgi.io - Gestione Tessile", layout="wide")
 
-# CSS per rendere l'app Dark e professionale come la tua foto
 st.markdown("""
     <style>
     .stApp { background-color: #0e1117; color: white; }
     [data-testid="stSidebar"] { background-color: #1f2937; border-right: 1px solid #3b82f6; }
     .stMetric { background-color: #1f2937; padding: 15px; border-radius: 10px; border-left: 5px solid #3b82f6; }
     h1, h2, h3 { color: #3b82f6; }
+    .stDataFrame { background-color: #1f2937; border-radius: 10px; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -34,87 +34,82 @@ def check_password():
                 st.error("❌ Password errata")
     return False
 
-# 3. ESECUZIONE APP (Solo se loggato)
+# 3. CARICAMENTO DATI DAL TUO GOOGLE SHEET
+@st.cache_data(ttl=60) # Aggiorna i dati ogni 60 secondi
+def load_data():
+    url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQULq1AyqK-pIhgesMkDbbf1yO1rysqtdo5_SS7hrrzn4Qf0gvEgD8LoT98Urw4QIaCIwX4yDz-US0_/pub?output=csv"
+    df = pd.read_csv(url)
+    return df
+
+# 4. ESECUZIONE APP
 if check_password():
     
-    # --- DATABASE TEMPORANEO (Lo collegheremo a Excel dopo) ---
-    clienti_df = pd.DataFrame({
-        'Cliente': ['Rossi Tessuti', 'Moda Prato', 'Filati snc', 'Tessitura Toscana'],
-        'Stato': ['✅ ATTIVO', '🆘 RECUPERARE', '✅ ATTIVO', '🆘 RECUPERARE'],
-        'Località': ['Prato', 'Montemurlo', 'Prato', 'Campi Bisenzio'],
-        'Ultimo Ordine': ['2024-05-10', '2023-11-20', '2024-05-12', '2024-01-15']
-    })
-
-    prodotti_df = pd.DataFrame({
-        'Articolo': ['Lana Verginel', 'Seta Lucida', 'Lino Grezzo', 'Cotone Bio'],
-        'Prezzo (€/mt)': [25.50, 45.00, 18.00, 12.50],
-        'Disponibilità': [1200, 450, 2100, 3000],
-        'Immagine': ['🧶', '✨', '🌾', '🌱']
-    })
-
-    # --- SIDEBAR DI NAVIGAZIONE ---
-    with st.sidebar:
-        st.image("https://cdn-icons-png.flaticon.com/512/3063/3063822.png", width=80)
-        st.title("Gofgi.io")
-        menu = st.radio("MENU PRINCIPALE", 
-                        ["📊 Dashboard", "👥 Anagrafica Clienti", "📦 Magazzino Prodotti", "📝 Crea Preventivo", "🛒 Ordini Ricevuti"])
-        st.divider()
-        if st.button("🚪 Esci"):
-            st.session_state["password_correct"] = False
-            st.rerun()
-
-    # --- LOGICA DELLE PAGINE ---
-    
-    if menu == "📊 Dashboard":
-        st.title("Pannello di Controllo")
-        c1, c2, c3, c4 = st.columns(4)
-        c1.metric("FATTURATO MESE", "105.000 €", "+12%")
-        c2.metric("CLIENTI ATTIVI", "450", "+3")
-        c3.metric("ORDINI OGGI", "12", "+2")
-        c4.metric("DA RECUPERARE", "2", "🆘")
+    # Carichiamo i dati reali dal link che mi hai dato
+    try:
+        data_all = load_data()
         
-        st.divider()
-        col_graf, col_sos = st.columns([2, 1])
-        with col_graf:
-            st.subheader("Andamento Vendite per Cliente")
-            fig = px.bar(clienti_df, x='Cliente', y=[10, 4, 8, 2], template="plotly_dark", color_discrete_sequence=['#3b82f6'])
-            st.plotly_chart(fig, use_container_width=True)
-        with col_sos:
-            st.subheader("🆘 SOS Recupero")
-            st.table(clienti_df[clienti_df['Stato'] == '🆘 RECUPERARE'][['Cliente', 'Ultimo Ordine']])
+        # --- SIDEBAR DI NAVIGAZIONE ---
+        with st.sidebar:
+            st.title("Gofgi.io")
+            menu = st.radio("MENU PRINCIPALE", 
+                            ["📊 Dashboard", "👥 Anagrafica Clienti", "📦 Magazzino Prodotti", "📝 Crea Preventivo"])
+            st.divider()
+            if st.button("🔄 Aggiorna Dati"):
+                st.cache_data.clear()
+                st.rerun()
+            if st.button("🚪 Esci"):
+                st.session_state["password_correct"] = False
+                st.rerun()
 
-    elif menu == "👥 Anagrafica Clienti":
-        st.title("Anagrafica Clienti")
-        search = st.text_input("Cerca cliente per nome...")
-        filtered_df = clienti_df[clienti_df['Cliente'].str.contains(search, case=False)]
-        st.dataframe(filtered_df, use_container_width=True)
+        # --- LOGICA DELLE PAGINE ---
 
-    elif menu == "📦 Magazzino Prodotti":
-        st.title("Magazzino Prodotti")
-        for i, row in prodotti_df.iterrows():
-            with st.expander(f"{row['Immagine']} {row['Articolo']} - {row['Prezzo (€/mt)']}€/mt"):
-                st.write(f"**Disponibilità:** {row['Disponibilità']} metri")
-                st.write(f"**Codice Interno:** PRD-00{i}")
-                st.button("Vedi scheda tecnica", key=f"btn_{i}")
+        if menu == "📊 Dashboard":
+            st.title("Pannello di Controllo")
+            # Metriche basate sui tuoi dati (es. conteggio righe o somme se ci sono colonne numeriche)
+            c1, c2, c3 = st.columns(3)
+            c1.metric("TOTALE VOCI NEL FOGLIO", len(data_all))
+            c2.metric("STATO SISTEMA", "Online")
+            c3.metric("DATABASE", "Collegato ✅")
+            
+            st.divider()
+            st.subheader("Anteprima Dati dal Google Sheet")
+            st.dataframe(data_all.head(10), use_container_width=True)
 
-    elif menu == "📝 Crea Preventivo":
-        st.title("Generatore Preventivi WhatsApp")
-        c1, c2 = st.columns(2)
-        with c1:
-            cl = st.selectbox("Seleziona Cliente", clienti_df['Cliente'])
-            pr = st.selectbox("Seleziona Prodotto", prodotti_df['Articolo'])
-        with c2:
-            qt = st.number_input("Metri richiesti", min_value=1)
-            prezzo_finale = prodotti_df[prodotti_df['Articolo'] == pr]['Prezzo (€/mt)'].values[0] * qt
-            st.write(f"### Totale: {prezzo_finale:.2f} €")
-        
-        if st.button("🚀 GENERA LINK WHATSAPP"):
-            messaggio = f"Ciao {cl}, ti propongo {qt}mt di {pr}. Totale: {prezzo_finale}€. Ti interessa?"
-            st.success("Link pronto!")
-            st.link_button("Invia ora al cliente", f"https://wa.me/393330000000?text={messaggio}")
+        elif menu == "👥 Anagrafica Clienti":
+            st.title("Ricerca nel Database")
+            # Creiamo una barra di ricerca universale sui tuoi dati
+            search = st.text_input("Cerca qualsiasi valore (Nome, Prodotto, Località)...")
+            if search:
+                # Filtra il database per qualsiasi colonna che contiene il testo cercato
+                mask = data_all.astype(str).apply(lambda x: x.str.contains(search, case=False)).any(axis=1)
+                filtered_df = data_all[mask]
+                st.dataframe(filtered_df, use_container_width=True)
+            else:
+                st.dataframe(data_all, use_container_width=True)
 
-    elif menu == "🛒 Ordini Ricevuti":
-        st.title("Storico Ordini")
-        st.info("Qui verranno visualizzati gli ordini confermati dai clienti.")
-        # Esempio tabella ordini
-        st.table(pd.DataFrame({'Data': ['12/05/2024'], 'Cliente': ['Rossi Tessuti'], 'Totale': ['1.200€'], 'Stato': ['In Lavorazione']}))
+        elif menu == "📦 Magazzino Prodotti":
+            st.title("Visualizzazione Catalogo")
+            st.write("Ecco i dati estratti dal tuo foglio:")
+            st.table(data_all)
+
+        elif menu == "📝 Crea Preventivo":
+            st.title("Generatore Messaggio WhatsApp")
+            st.write("Seleziona una riga dal tuo database per inviare i dettagli:")
+            
+            # Selezione riga
+            selected_row = st.selectbox("Scegli la voce dal database", data_all.index)
+            row_data = data_all.iloc[selected_row]
+            
+            st.write("### Dettagli selezionati:")
+            st.json(row_data.to_dict())
+            
+            numero_tel = st.text_input("Numero WhatsApp del cliente (es. 39333...)", "39")
+            
+            if st.button("🚀 GENERA LINK WHATSAPP"):
+                # Crea un messaggio automatico con i dati della riga selezionata
+                testo_messaggio = "Ciao! Ecco i dettagli richiesti: " + str(row_data.to_dict())
+                st.link_button("Invia ora", f"https://wa.me/{numero_tel}?text={testo_messaggio}")
+
+    except Exception as e:
+        st.error(f"Errore nel caricamento dei dati: {e}")
+        st.info("Assicurati che il link di pubblicazione del Google Sheet sia corretto e impostato su CSV.")
